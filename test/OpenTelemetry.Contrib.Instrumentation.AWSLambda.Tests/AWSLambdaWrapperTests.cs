@@ -15,6 +15,7 @@
 // </copyright>
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
@@ -275,6 +276,24 @@ namespace OpenTelemetry.Contrib.Instrumentation.AWSLambda.Tests
             Assert.True(activities.Length == 0);
         }
 
+        [Fact]
+        public void TestResourceAdditionalAttributesFromEnvVar()
+        {
+            Environment.SetEnvironmentVariable("OTEL_RESOURCE_ATTRIBUTES", "application=TestApplication");
+
+            var processor = new Mock<BaseProcessor<Activity>>();
+
+            using (var tracerProvider = Sdk.CreateTracerProviderBuilder()
+                .AddAWSLambdaConfigurations()
+                .AddProcessor(processor.Object)
+                .Build())
+            {
+                var result = AWSLambdaWrapper.Trace(tracerProvider, this.sampleHandlers.SampleHandlerSyncReturn, "TestStream", this.sampleLambdaContext);
+                var resource = tracerProvider.GetResource();
+                this.AssertResourceAttributes(resource, new Dictionary<string, object> { ["application"] = "TestApplication" });
+            }
+        }
+
         private void AssertSpanProperties(Activity activity)
         {
             Assert.Equal("5759e988bd862e3fe1be46a994272793", activity.TraceId.ToHexString());
@@ -284,13 +303,20 @@ namespace OpenTelemetry.Contrib.Instrumentation.AWSLambda.Tests
             Assert.Equal("testfunction", activity.DisplayName);
         }
 
-        private void AssertResourceAttributes(Resource resource)
+        private void AssertResourceAttributes(Resource resource, IDictionary<string, object> additionalAttributes = null)
         {
             var resourceAttributes = resource.Attributes.ToDictionary(x => x.Key, x => x.Value);
             Assert.Equal("aws", resourceAttributes[AWSLambdaSemanticConventions.AttributeCloudProvider]);
             Assert.Equal("us-east-1", resourceAttributes[AWSLambdaSemanticConventions.AttributeCloudRegion]);
             Assert.Equal("testfunction", resourceAttributes[AWSLambdaSemanticConventions.AttributeFaasName]);
             Assert.Equal("latest", resourceAttributes[AWSLambdaSemanticConventions.AttributeFaasVersion]);
+            if (additionalAttributes != null)
+            {
+                foreach (var additionalAttribute in additionalAttributes)
+                {
+                    Assert.Equal(additionalAttribute.Value, resourceAttributes[additionalAttribute.Key]);
+                }
+            }
         }
 
         private void AssertSpanAttributes(Activity activity)
