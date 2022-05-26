@@ -281,11 +281,8 @@ namespace OpenTelemetry.Contrib.Instrumentation.AWSLambda.Tests
         {
             Environment.SetEnvironmentVariable("OTEL_RESOURCE_ATTRIBUTES", "application=TestApplication");
 
-            var processor = new Mock<BaseProcessor<Activity>>();
-
             using (var tracerProvider = Sdk.CreateTracerProviderBuilder()
                 .AddAWSLambdaConfigurations()
-                .AddProcessor(processor.Object)
                 .Build())
             {
                 var result = AWSLambdaWrapper.Trace(tracerProvider, this.sampleHandlers.SampleHandlerSyncReturn, "TestStream", this.sampleLambdaContext);
